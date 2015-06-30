@@ -1,0 +1,7 @@
+struct raw_bytes_t  // a generic container for raw ASCII or binary data (e.g., received on a serial UART or read from a file)
+{
+    int64_t  timestamp;  // in milliseconds since 1970-01-01T00:00:00
+    int64_t  size;       //
+    byte     raw[size];  //
+}
+
