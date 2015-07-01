@@ -10,6 +10,7 @@ import raw_bytes_t
 # TODO: Implement this as a bridge class with sio and lio attribute
 # TODO: extend to include multiple sio<=>lio lanes
 
+
 def publish_serial_line(raw, lio, channel):
     msg = raw_bytes_t()
     msg.timestamp = int(time.time() * 1e6)
@@ -23,20 +24,17 @@ def raw_handler(channel, data):
 
 sio = serial.Serial(port='/dev/ttyS0', baudrate=9600, timeout=0)
 sio.nonblocking()
+
 lio = lcm.LCM()
 
-inputs = [sio, lio]
-# inputs = [sio.fileno(), lio.fileno()]
-outputs = inputs
-errors = [] # TODO: catch and handle errors
+ios = [sio, lio]
 
 serial_buffer = '' # TODO: try implementing as a deque
 serial_lines = []
 
 try:
-    timeout = 0.1 # in seconds TODO: test removing
     while True:
-        readable, writable, exceptional = select.select(inputs, outputs, errors, timeout)
+        readable, writable, exceptional = select.select(ios, ios, ios)
         if sio in readable: 
             serial_buffer += sio.read(sio.inWaiting())
         if '/n' in serial_buffer:
