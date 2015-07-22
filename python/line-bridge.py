@@ -3,6 +3,7 @@
 import collections
 import time
 import select
+import sys
 
 import crcmod
 import serial
@@ -38,23 +39,39 @@ class BufferedSerialWithHandler(serial.Serial):
         self.fill()
         self.handler(self.channel, self.buffer) # handler is intended to be the method that inspects the buffer for delimiters (or for headers, payloads, and checksums) and publishes the appropriate parts to LCM
 
+    def set_delimiter(self, delimiter):
+        self.delimiter = delimiter.encode(sys.stdin.encoding)
+
 
 class Lane:
     """
     """
-    def __init__(self, sio=BufferedSerialWithHandler(), lio=lcm.LCM()):
+    def __init__(self, sio=BufferedSerialWithHandler(), lio=lcm.LCM(),
+            verbosity=0):
+        self.verbosity = verbosity
         self.sio = sio
-        self.sio.nonblocking()
         self.lio = lio
 
     def open(self):
+        self.sio.open()
+        self.sio.nonblocking()
+        ios = (self.sio, self.lio)
         try:
             while True:
                 readable, writable, exceptional = select.select(ios, ios, ios)
-            if sio in readable and lio in writable:
-                sio.handle()
-            if lio in readable and sio in writable:
-                lio.handle()
+                if self.verbosity > 2: # TODO: use logging module instead
+                    print('readable:{0}'.format(readable))
+                    print('writable:{0}'.format(writable))
+                    print('exceptional:{0}'.format(exceptional))
+                if self.sio in readable and self.lio in writable:
+                    self.sio.handle()
+                elif self.sio in readable:
+                    print('serial is readable, but LCM is not writable')
+                if self.lio in readable and self.sio in writable:
+                    self.lio.handle()
+                elif self.lio in readable:
+                    print('LCM is readable, but serial is not writable')
+                time.sleep(1)
         except KeyboardInterrupt:
             print('Terminated by user.')
 
@@ -70,9 +87,11 @@ class Lane:
         # TODO: check for extra functionality using py3 string encode & decode
 
     def serial_delimiter_handler(self, channel, data):
-        while delimiter in data:
+        print('data: {0}'.format(data))
+        print('delimiter: {0}'.format(self.sio.delimiter))
+        while self.sio.delimiter in data:
             linelist = data.pop()
-            while linelist[-1] is not delimiter:
+            while linelist[-1] is not self.sio.delimiter:
                 linelist.extend(data.pop())
             msg = raw_bytes_t()
             msg.timestamp = self.sio.readtime
@@ -81,10 +100,10 @@ class Lane:
             self.lio.publish(channel, msg.encode())
 
     def serial_line_handler(self, channel, data):
-        self.sio.set_delimiter('\n')
+        self.sio.set_delimiter(b'\r')
         self.serial_delimiter_handler(channel, data)
 
-    def serial_header_payload_checksum_handler(self, channel, data)
+    def serial_header_payload_checksum_handler(self, channel, data):
         pq = collections.deque(maxlen=self.sio.preamble_len)
         while pq.count(self.sio.preamble_char) < self.sio.preamble_len:
             pq.append(data.pop())
@@ -107,18 +126,19 @@ class Lane:
             msg.size = len(hpc)
             msg.raw = hpc
             self.lio.publish(channel, msg.encode())
-        else
+        else:
             print('checksum mismatch: read {0}, calulated {1}'.format(checksum_read, checksum_calc))
             # TODO: publish on a different channel?
 
 
-port_name = 'ttyS0'
-lane = Lane()
-lane.sio.port = '/dev/' + port_name
-lane.sio.baudrate = 9600
-lane.sio.subscribe(port_name, lane.serial_line_handler)
-lane.lio.subscribe(port_name, lane.lcm_handler)
-lane.open() # TODO: add optional verbose output
+def main(port, channel=None, baudrate=38400, verbosity=0):
+    if channel is None: channel = port.split('/')[-1]
+    lane = Lane(verbosity=verbosity)
+    lane.sio.port = port
+    lane.sio.baudrate = baudrate
+    lane.sio.subscribe('.'.join((channel, 'in')), lane.serial_line_handler)
+    lane.lio.subscribe('.'.join((channel, 'out')), lane.lcm_handler)
+    lane.open() # TODO: add optional verbose output
 
 # For Rowe Technologies ADCP:
 # port_name = 'ttyS0'
@@ -135,4 +155,19 @@ lane.open() # TODO: add optional verbose output
 # lane.lio.subscribe(port_name, lane.lcm_handler)
 # lane.open() # TODO: add optional verbose output
 
-
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='serial-LCM bridge')
+    parser.add_argument('-V', '--version', action='version',
+        version='%(prog)s 0.0.1',
+        help='display version information and exit')
+    parser.add_argument('port', default='/dev/ttyS0',
+        type=str, help='serial port to bridge')
+    parser.add_argument('-c', '--channel', default=None,
+        type=str, help='LCM channel to bridge')
+    parser.add_argument('-b','--baudrate', default=38400,
+        type=int, help='baud rate for serial port')
+    parser.add_argument('-v','--verbosity', default=0, action='count',
+        help='increase output')
+    args = parser.parse_args()
+    main(**args.__dict__)
