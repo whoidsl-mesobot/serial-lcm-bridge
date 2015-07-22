@@ -40,7 +40,10 @@ class BufferedSerialWithHandler(serial.Serial):
         self.handler(self.channel, self.buffer) # handler is intended to be the method that inspects the buffer for delimiters (or for headers, payloads, and checksums) and publishes the appropriate parts to LCM
 
     def set_delimiter(self, delimiter):
-        self.delimiter = delimiter.encode(sys.stdin.encoding)
+        self.delimiter = ord(delimiter)
+
+    def get_delimiter(self):
+        return chr(self.delimiter)
 
 
 class Lane:
@@ -87,21 +90,21 @@ class Lane:
         # TODO: check for extra functionality using py3 string encode & decode
 
     def serial_delimiter_handler(self, channel, data):
-        print('data: {0}'.format(data))
-        print('delimiter: {0}'.format(self.sio.delimiter))
         while self.sio.delimiter in data:
-            linelist = data.pop()
+            linelist = [data.popleft()]
             while linelist[-1] is not self.sio.delimiter:
-                linelist.extend(data.pop())
+                linelist.append(data.popleft())
             msg = raw_bytes_t()
             msg.timestamp = self.sio.readtime
             msg.size = len(linelist)
-            msg.raw = linelist # TODO: is this faster using a string?
+            msg.raw = linelist
             self.lio.publish(channel, msg.encode())
+            if self.verbosity > 0: print('sent: {m.raw}'.format(m=msg))
 
     def serial_line_handler(self, channel, data):
         self.sio.set_delimiter(b'\r')
         self.serial_delimiter_handler(channel, data)
+        # TODO: consider implementing this with another LCM type using an actual UTF-8 string
 
     def serial_header_payload_checksum_handler(self, channel, data):
         pq = collections.deque(maxlen=self.sio.preamble_len)
