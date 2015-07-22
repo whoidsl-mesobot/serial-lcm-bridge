@@ -6,4 +6,3 @@ struct raw_bytes_t  // a generic container for raw ASCII or binary data (e.g., r
     int64_t  size;       //
     byte     raw[size];  //
 }
-
