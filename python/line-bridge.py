@@ -9,7 +9,7 @@ import crcmod
 import serial
 
 import lcm
-import raw_bytes_t
+from lcmtypes import raw_bytes_t
 
 # TODO: extend to include multiple sio<=>lio lanes
 
