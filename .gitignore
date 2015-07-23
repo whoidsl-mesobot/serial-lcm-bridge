@@ -1,0 +1,3 @@
+python/lcmtypes/*
+java/lcmtypes/*
+*.pyc
