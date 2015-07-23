@@ -15,8 +15,7 @@ class SerialWithHandler(serial.Serial):
     Provides `handle` and `subscribe` methods to be similar to LCM interface.
 
     """
-    def __init__(self, buffer_size=255, channel=None, handler=None, **kw):
-        self.buffer = bytearray(buffer_size) # use bytearray because a deque is implicitly casting bytes to ints
+    def __init__(self, channel=None, handler=None, **kw):
         self.readtime = None
         self.channel = channel
         self.handler = handler
@@ -40,14 +39,13 @@ class BufferedSerialWithHandler(SerialWithHandler):
     """
     """
     def __init__(self, buffer_size=255, channel=None, handler=None, **kw):
+        self.buffer_size = buffer_size
         self.buffer = bytearray() # use bytearray because a deque is implicitly casting bytes to ints
-        self.channel = channel
-        self.handler = handler
-        super().__init__(**kw)
+        super().__init__(channel, handler, **kw)
 
     def fill(self):
         max_to_read = min(self.inWaiting(), self.buffer_size - len(self.buffer))
-        bytes_read = self.buffer.extend(self.sio.read(max_to_read))
+        bytes_read = self.buffer.extend(self.read(max_to_read))
         if self.inWaiting() > 0:
             print('buffer full with {0} bytes waiting'.format(self.inWaiting()))
 
@@ -100,21 +98,18 @@ class Lane:
         # TODO: check for extra functionality using py3 string encode & decode
 
     def serial_delimiter_handler(self, channel, data):
-        print('data: {0}'.format(data))
-        print('delimiter: {0}'.format(self.sio.delimiter))
-        while self.sio.delimiter in data:
-            line, data = data.split(self.sio.delimiter)
-            print('split: {0} {1}'.format(line, data))
+        msg = raw_bytes_t()
+        msg.timestamp = self.sio.readtime
+        while self.sio.delimiter in self.sio.buffer:
+            line, self.sio.buffer = self.sio.buffer.split(self.sio.delimiter, 1)
             line += self.sio.delimiter # preserve the delimiter (for now)
-            msg = raw_bytes_t()
-            msg.timestamp = self.sio.readtime
             msg.size = len(line)
-            msg.raw = list(line)
+            msg.raw = line
             self.lio.publish(channel, msg.encode())
-            print('sent delimited bytes: {0}'.format(line))
+            if self.verbosity > 0: print('sent: {m.raw}'.format(m=msg))
 
     def serial_line_handler(self, channel, data):
-        self.sio.set_delimiter(b'\r')
+        self.sio.set_delimiter(b'\n')
         self.serial_delimiter_handler(channel, data)
 
 
