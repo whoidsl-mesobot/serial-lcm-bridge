@@ -24,7 +24,7 @@ class SerialWithHandler(serial.Serial):
 
     def handle(self):
         self.readtime = int(time.time() * 1e6)
-        self.handler(self.channel, self.sio.read(self.sio.inWaiting()))
+        self.handler(self.channel, self.read(self.inWaiting()))
 
     def subscribe(self, channel, handler):
         self.channel = channel
@@ -58,15 +58,23 @@ class BufferedSerialWithHandler(SerialWithHandler):
 class Lane:
     """
     """
-    def __init__(self, sio=BufferedSerialWithHandler(), lio=lcm.LCM(),
-            verbosity=0):
+    def __init__(self, sio, lio=lcm.LCM(), verbosity=0, qmax=2**13):
         self.verbosity = verbosity
         self.sio = sio
         self.lio = lio
+        self.q = bytearray() # put the serial queue/buffer in the lane class instead
+        self.qmax = qmax
 
-    def open(self):
+    def open(self, port, channel=None, baudrate=9600):
+        if channel is None: channel = port.split('/')[-1]
+        self.sio.port = port
+        self.sio.baudrate = baudrate
         self.sio.open()
         self.sio.nonblocking()
+        
+        self.sio.subscribe('.'.join((channel, 'in')), self.serial_handler)
+        self.lio.subscribe('.'.join((channel, 'out')), self.lcm_handler)
+        
         ios = (self.sio, self.lio)
         try:
             while True:
@@ -89,38 +97,56 @@ class Lane:
     def close(self):
         self.sio.close()
 
+
+class TextLane(Lane):
+
+    def __init__(self, sio=SerialWithHandler(), lio=lcm.LCM(), verbosity=0, delimiter=b'\n'):
+        if type(delimiter) is str: delimiter = delimiter.encode()
+        self.msg = line_t()
+        self.delimiter = delimiter
+        super().__init__(sio, lio, verbosity)
+
     def lcm_handler(self, channel, data):
         """Decode incoming LCM messages and write directly to serial output.
         """
-        msg = raw_bytes_t.decode(data)
-        # TODO: consider re-using raw_bytes_t object
-        self.sio.write(bytearray(msg.raw))
-        # TODO: check for extra functionality using py3 string encode & decode
+        self.sio.write(self.msg.decode(data).line)
 
-    def serial_delimiter_handler(self, channel, data):
-        msg = raw_bytes_t()
+    def serial_handler(self, channel, data):
+        self.msg.timestamp = self.sio.readtime
+        self.q.extend(data)
+        while self.delimiter in self.q:
+            h, s, self.q = self.q.partition(self.delimiter)
+            self.msg.line = (h + s).decode()
+            self.lio.publish(channel, self.msg.encode())
+            if self.verbosity > 0: print('sent: {m.line}'.format(m=self.msg))
+        if len(self.q) > self.qmax:
+            print('queue too long, clearing')
+            self.q.clear()
+
+
+class BinaryLane(Lane):
+
+    def __init__(self, sio=SerialWithHandler(), lio=lcm.LCM(), verbosity=0):
+        self.msg = raw_bytes_t()
+        super().__init__(sio, lio, verbosity)
+
+    def lcm_handler(self, channel, data):
+        """Decode incoming LCM messages and write directly to serial output.
+        """
+        self.sio.write(self.msg.decode(data).raw)
+
+    def serial_handler(self, channel, data):
+        self.q.extend(data)
         msg.timestamp = self.sio.readtime
-        while self.sio.delimiter in self.sio.buffer:
-            line, self.sio.buffer = self.sio.buffer.split(self.sio.delimiter, 1)
-            line += self.sio.delimiter # preserve the delimiter (for now)
-            msg.size = len(line)
-            msg.raw = line
-            self.lio.publish(channel, msg.encode())
-            if self.verbosity > 0: print('sent: {m.raw}'.format(m=msg))
-
-    def serial_line_handler(self, channel, data):
-        self.sio.set_delimiter(b'\n')
-        self.serial_delimiter_handler(channel, data)
+        if len(self.q) > self.qmax:
+            print('queue too long, clearing')
+            self.q.clear()
 
 
-def main(port, channel=None, baudrate=38400, verbosity=0):
+def main(port, channel=None, baudrate=9600, verbosity=0):
     if channel is None: channel = port.split('/')[-1]
-    lane = Lane(verbosity=verbosity)
-    lane.sio.port = port
-    lane.sio.baudrate = baudrate
-    lane.sio.subscribe('.'.join((channel, 'in')), lane.serial_line_handler)
-    lane.lio.subscribe('.'.join((channel, 'out')), lane.lcm_handler)
-    lane.open() # TODO: add optional verbose output
+    lane = TextLane(verbosity=verbosity)
+    lane.open(port, channel, baudrate)
 
 
 if __name__ == '__main__':
@@ -133,7 +159,7 @@ if __name__ == '__main__':
         type=str, help='serial port to bridge')
     parser.add_argument('-c', '--channel', default=None,
         type=str, help='LCM channel to bridge')
-    parser.add_argument('-b','--baudrate', default=38400,
+    parser.add_argument('-b','--baudrate', default=9600,
         type=int, help='baud rate for serial port')
     parser.add_argument('-v','--verbosity', default=0, action='count',
         help='increase output')
