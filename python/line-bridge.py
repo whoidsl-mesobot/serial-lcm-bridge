@@ -9,7 +9,7 @@ import crcmod
 import serial
 
 import lcm
-from lcmtypes import raw_bytes_t
+from lcmtypes import raw_bytes_t, line_t
 
 # TODO: extend to include multiple sio<=>lio lanes
 
@@ -102,9 +102,17 @@ class Lane:
             if self.verbosity > 0: print('sent: {m.raw}'.format(m=msg))
 
     def serial_line_handler(self, channel, data):
-        self.sio.set_delimiter(b'\r')
-        self.serial_delimiter_handler(channel, data)
-        # TODO: consider implementing this with another LCM type using an actual UTF-8 string
+        msg = line_t()
+        msg.timestamp = self.sio.readtime
+        while ord(b'\r') in data:
+            linelist = [data.popleft()]
+            while linelist[-1] is not ord(b'\r'):
+                linelist.append(data.popleft())
+            if data[0] is ord(b'\n'):
+                linelist.append(data.popleft())
+            msg.line = bytearray(linelist).decose()
+            self.lio.publish(channel, msg.encode())
+            if self.verbosity > 0: print('sent: {m.raw}'.format(m=msg))
 
     def serial_header_payload_checksum_handler(self, channel, data):
         pq = collections.deque(maxlen=self.sio.preamble_len)
