@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 
-import collections
 import time
 import select
-
-import crcmod
 import serial
-
 import lcm
+
 from lcmtypes import raw_bytes_t, line_t
 
 # TODO: extend to include multiple sio<=>lio lanes
@@ -89,17 +86,17 @@ class Lane:
                 elif self.lio in readable:
                     print('LCM is readable, but serial is not writable')
         except KeyboardInterrupt:
-            print('Terminated by user.')
+            self.close()
 
     def close(self):
-        raise NotImplementedError
+        self.sio.close()
 
     def lcm_handler(self, channel, data):
         """Decode incoming LCM messages and write directly to serial output.
         """
         msg = raw_bytes_t.decode(data)
         # TODO: consider re-using raw_bytes_t object
-        self.sio.write(''.join(c for c in msg.raw))
+        self.sio.write(bytearray(msg.raw))
         # TODO: check for extra functionality using py3 string encode & decode
 
     def serial_delimiter_handler(self, channel, data):
@@ -120,33 +117,6 @@ class Lane:
         self.sio.set_delimiter(b'\r')
         self.serial_delimiter_handler(channel, data)
 
-    def serial_header_payload_checksum_handler(self, channel, data):
-        pq = collections.deque(maxlen=self.sio.preamble_len)
-        while pq.count(self.sio.preamble_char) < self.sio.preamble_len:
-            pq.append(data.pop())
-        header = ''.join(c for c in pq)
-        while len(header) < self.sio.header_struct.size:
-            header += data.pop()
-        payload_size = self.sio.header_struct.unpack(header)[self.sio.header_payload_size_index]
-        payload = data.pop()
-        while len(payload) < payload_size:
-            payload += data.pop() # TODO: There's probably a better way to do this.
-        checksum = data.pop()
-        while len(checksum) < self.sio.crc_struct.size:
-            checksum += data.pop()
-        checksum_read = self.sio.crc_struct.unpack(checksum)[0]
-        checksum_calc = self.sio.crc(payload)
-        if checksum_calc is checksum_read:
-            hpc = header + payload + checksum
-            msg = raw_bytes_t()
-            msg.timestamp = self.sio.readtime
-            msg.size = len(hpc)
-            msg.raw = hpc
-            self.lio.publish(channel, msg.encode())
-        else:
-            print('checksum mismatch: read {0}, calulated {1}'.format(checksum_read, checksum_calc))
-            # TODO: publish on a different channel?
-
 
 def main(port, channel=None, baudrate=38400, verbosity=0):
     if channel is None: channel = port.split('/')[-1]
@@ -157,20 +127,6 @@ def main(port, channel=None, baudrate=38400, verbosity=0):
     lane.lio.subscribe('.'.join((channel, 'out')), lane.lcm_handler)
     lane.open() # TODO: add optional verbose output
 
-# For Rowe Technologies ADCP:
-# port_name = 'ttyS0'
-# lane = Lane()
-# lane.sio.port = '/dev/' + port_name
-# lane.sio.baudrate = 9600
-# lane.sio.preamble_char = b'\x80'
-# lane.sio.preamble_len = 16
-# lane.sio.header_struct = struct.Struct(8*'i')
-# lane.sio.header_payload_size_index = 6
-# lane.sio.crc_struct = struct.Struct('<I')
-# lane.sio.crc = crcmod.predefined.mkPredefinedCrcFun('xmodem')
-# lane.sio.subscribe(port_name, lane.serial_header_payload_checksum_handler)
-# lane.lio.subscribe(port_name, lane.lcm_handler)
-# lane.open() # TODO: add optional verbose output
 
 if __name__ == '__main__':
     import argparse
