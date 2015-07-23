@@ -8,12 +8,15 @@ import crcmod
 import serial
 
 import lcm
-from lcmtypes import raw_bytes_t
+from lcmtypes import raw_bytes_t, line_t
 
 # TODO: extend to include multiple sio<=>lio lanes
 
-class BufferedSerialWithHandler(serial.Serial):
-    """
+class SerialWithHandler(serial.Serial):
+    """Lightweight wrapper around serial interface.
+
+    Provides `handle` and `subscribe` methods to be similar to LCM interface.
+
     """
     def __init__(self, buffer_size=255, channel=None, handler=None, **kw):
         self.buffer = bytearray(buffer_size) # use bytearray because a deque is implicitly casting bytes to ints
@@ -23,24 +26,38 @@ class BufferedSerialWithHandler(serial.Serial):
         kw.update(timeout=0)
         super().__init__(**kw)
 
-    def fill(self):
-        # max_to_read = min(self.inWaiting(), self.buffer_size - len(self.buffer))
-        bytes_read = self.readinto(self.buffer)
+    def handle(self):
         self.readtime = int(time.time() * 1e6)
-        if self.inWaiting() > 0:
-            print('buffer full with {0} bytes waiting'.format(self.inWaiting()))
+        self.handler(self.channel, self.sio.read(self.sio.inWaiting()))
 
     def subscribe(self, channel, handler):
         self.channel = channel
         self.handler = handler
         return (channel, handler)
 
-    def handle(self):
-        self.fill() # TODO: can get rid of this method if using bytearray as buffer
-        self.handler(self.channel, self.buffer) # handler is intended to be the method that inspects the buffer for delimiters (or for headers, payloads, and checksums) and publishes the appropriate parts to LCM
-
     def set_delimiter(self, delimiter):
         self.delimiter = delimiter
+
+
+class BufferedSerialWithHandler(SerialWithHandler):
+    """
+    """
+    def __init__(self, buffer_size=255, channel=None, handler=None, **kw):
+        self.buffer = bytearray() # use bytearray because a deque is implicitly casting bytes to ints
+        self.channel = channel
+        self.handler = handler
+        super().__init__(**kw)
+
+    def fill(self):
+        max_to_read = min(self.inWaiting(), self.buffer_size - len(self.buffer))
+        bytes_read = self.buffer.extend(self.sio.read(max_to_read))
+        if self.inWaiting() > 0:
+            print('buffer full with {0} bytes waiting'.format(self.inWaiting()))
+
+    def handle(self):
+        self.readtime = int(time.time() * 1e6)
+        self.fill()
+        self.handler(self.channel, None) # passing the buffer as an arg wouldn't let it be changed within the handler
 
 
 class Lane:
@@ -71,7 +88,6 @@ class Lane:
                     self.lio.handle()
                 elif self.lio in readable:
                     print('LCM is readable, but serial is not writable')
-                time.sleep(1)
         except KeyboardInterrupt:
             print('Terminated by user.')
 
