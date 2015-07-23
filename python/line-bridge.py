@@ -1,63 +1,80 @@
 #!/usr/bin/env python
 
-import collections
 import time
 import select
-import sys
-
-import crcmod
 import serial
-
 import lcm
+
 from lcmtypes import raw_bytes_t, line_t
 
 # TODO: extend to include multiple sio<=>lio lanes
 
-class BufferedSerialWithHandler(serial.Serial):
+class SerialWithHandler(serial.Serial):
+    """Lightweight wrapper around serial interface.
+
+    Provides `handle` and `subscribe` methods to be similar to LCM interface.
+
     """
-    """
-    def __init__(self, buffer_size=255, channel=None, handler=None, **kw):
-        self.buffer = collections.deque(maxlen=buffer_size)
+    def __init__(self, channel=None, handler=None, **kw):
         self.readtime = None
         self.channel = channel
         self.handler = handler
         kw.update(timeout=0)
         super().__init__(**kw)
 
-    def fill(self):
-        self.buffer.extend(self.read(min(self.inWaiting(),self.buffer.maxlen)))
+    def handle(self):
         self.readtime = int(time.time() * 1e6)
-        if self.inWaiting() > 0:
-            print('buffer full with {0} bytes waiting'.format(self.inWaiting()))
+        self.handler(self.channel, self.read(self.inWaiting()))
 
     def subscribe(self, channel, handler):
         self.channel = channel
         self.handler = handler
         return (channel, handler)
 
-    def handle(self):
-        self.fill()
-        self.handler(self.channel, self.buffer) # handler is intended to be the method that inspects the buffer for delimiters (or for headers, payloads, and checksums) and publishes the appropriate parts to LCM
-
     def set_delimiter(self, delimiter):
-        self.delimiter = ord(delimiter)
+        self.delimiter = delimiter
 
-    def get_delimiter(self):
-        return chr(self.delimiter)
+
+class BufferedSerialWithHandler(SerialWithHandler):
+    """
+    """
+    def __init__(self, buffer_size=255, channel=None, handler=None, **kw):
+        self.buffer_size = buffer_size
+        self.buffer = bytearray() # use bytearray because a deque is implicitly casting bytes to ints
+        super().__init__(channel, handler, **kw)
+
+    def fill(self):
+        max_to_read = min(self.inWaiting(), self.buffer_size - len(self.buffer))
+        bytes_read = self.buffer.extend(self.read(max_to_read))
+        if self.inWaiting() > 0:
+            print('buffer full with {0} bytes waiting'.format(self.inWaiting()))
+
+    def handle(self):
+        self.readtime = int(time.time() * 1e6)
+        self.fill()
+        self.handler(self.channel, None) # passing the buffer as an arg wouldn't let it be changed within the handler
 
 
 class Lane:
     """
     """
-    def __init__(self, sio=BufferedSerialWithHandler(), lio=lcm.LCM(),
-            verbosity=0):
+    def __init__(self, sio, lio=lcm.LCM(), verbosity=0, qmax=2**13):
         self.verbosity = verbosity
         self.sio = sio
         self.lio = lio
+        self.q = bytearray() # put the serial queue/buffer in the lane class instead
+        self.qmax = qmax
 
-    def open(self):
+    def open(self, port, channel=None, baudrate=9600):
+        if channel is None: channel = port.split('/')[-1]
+        self.sio.port = port
+        self.sio.baudrate = baudrate
         self.sio.open()
         self.sio.nonblocking()
+        
+        self.sio.subscribe('.'.join((channel, 'in')), self.serial_handler)
+        self.lio.subscribe('.'.join((channel, 'out')), self.lcm_handler)
+        
         ios = (self.sio, self.lio)
         try:
             while True:
@@ -74,97 +91,63 @@ class Lane:
                     self.lio.handle()
                 elif self.lio in readable:
                     print('LCM is readable, but serial is not writable')
-                time.sleep(1)
         except KeyboardInterrupt:
-            print('Terminated by user.')
+            self.close()
 
     def close(self):
-        raise NotImplementedError
+        self.sio.close()
+
+
+class TextLane(Lane):
+
+    def __init__(self, sio=SerialWithHandler(), lio=lcm.LCM(), verbosity=0, delimiter=b'\n'):
+        if type(delimiter) is str: delimiter = delimiter.encode()
+        self.msg = line_t()
+        self.delimiter = delimiter
+        super().__init__(sio, lio, verbosity)
 
     def lcm_handler(self, channel, data):
         """Decode incoming LCM messages and write directly to serial output.
         """
-        msg = raw_bytes_t.decode(data)
-        # TODO: consider re-using raw_bytes_t object
-        self.sio.write(''.join(c for c in msg.raw))
-        # TODO: check for extra functionality using py3 string encode & decode
+        self.sio.write(self.msg.decode(data).line)
 
-    def serial_delimiter_handler(self, channel, data):
-        while self.sio.delimiter in data:
-            linelist = [data.popleft()]
-            while linelist[-1] is not self.sio.delimiter:
-                linelist.append(data.popleft())
-            msg = raw_bytes_t()
-            msg.timestamp = self.sio.readtime
-            msg.size = len(linelist)
-            msg.raw = linelist
-            self.lio.publish(channel, msg.encode())
-            if self.verbosity > 0: print('sent: {m.raw}'.format(m=msg))
+    def serial_handler(self, channel, data):
+        self.msg.timestamp = self.sio.readtime
+        self.q.extend(data)
+        while self.delimiter in self.q:
+            h, s, self.q = self.q.partition(self.delimiter)
+            self.msg.line = (h + s).decode()
+            self.lio.publish(channel, self.msg.encode())
+            if self.verbosity > 0: print('sent: {m.line}'.format(m=self.msg))
+        if len(self.q) > self.qmax:
+            print('queue too long, clearing')
+            self.q.clear()
 
-    def serial_line_handler(self, channel, data):
-        msg = line_t()
+
+class BinaryLane(Lane):
+
+    def __init__(self, sio=SerialWithHandler(), lio=lcm.LCM(), verbosity=0):
+        self.msg = raw_bytes_t()
+        super().__init__(sio, lio, verbosity)
+
+    def lcm_handler(self, channel, data):
+        """Decode incoming LCM messages and write directly to serial output.
+        """
+        self.sio.write(self.msg.decode(data).raw)
+
+    def serial_handler(self, channel, data):
+        self.q.extend(data)
         msg.timestamp = self.sio.readtime
-        while ord(b'\r') in data:
-            linelist = [data.popleft()]
-            while linelist[-1] is not ord(b'\r'):
-                linelist.append(data.popleft())
-            if data[0] is ord(b'\n'):
-                linelist.append(data.popleft())
-            msg.line = bytearray(linelist).decose()
-            self.lio.publish(channel, msg.encode())
-            if self.verbosity > 0: print('sent: {m.raw}'.format(m=msg))
-
-    def serial_header_payload_checksum_handler(self, channel, data):
-        pq = collections.deque(maxlen=self.sio.preamble_len)
-        while pq.count(self.sio.preamble_char) < self.sio.preamble_len:
-            pq.append(data.pop())
-        header = ''.join(c for c in pq)
-        while len(header) < self.sio.header_struct.size:
-            header += data.pop()
-        payload_size = self.sio.header_struct.unpack(header)[self.sio.header_payload_size_index]
-        payload = data.pop()
-        while len(payload) < payload_size:
-            payload += data.pop() # TODO: There's probably a better way to do this.
-        checksum = data.pop()
-        while len(checksum) < self.sio.crc_struct.size:
-            checksum += data.pop()
-        checksum_read = self.sio.crc_struct.unpack(checksum)[0]
-        checksum_calc = self.sio.crc(payload)
-        if checksum_calc is checksum_read:
-            hpc = header + payload + checksum
-            msg = raw_bytes_t()
-            msg.timestamp = self.sio.readtime
-            msg.size = len(hpc)
-            msg.raw = hpc
-            self.lio.publish(channel, msg.encode())
-        else:
-            print('checksum mismatch: read {0}, calulated {1}'.format(checksum_read, checksum_calc))
-            # TODO: publish on a different channel?
+        if len(self.q) > self.qmax:
+            print('queue too long, clearing')
+            self.q.clear()
 
 
-def main(port, channel=None, baudrate=38400, verbosity=0):
+def main(port, channel=None, baudrate=9600, verbosity=0):
     if channel is None: channel = port.split('/')[-1]
-    lane = Lane(verbosity=verbosity)
-    lane.sio.port = port
-    lane.sio.baudrate = baudrate
-    lane.sio.subscribe('.'.join((channel, 'in')), lane.serial_line_handler)
-    lane.lio.subscribe('.'.join((channel, 'out')), lane.lcm_handler)
-    lane.open() # TODO: add optional verbose output
+    lane = TextLane(verbosity=verbosity)
+    lane.open(port, channel, baudrate)
 
-# For Rowe Technologies ADCP:
-# port_name = 'ttyS0'
-# lane = Lane()
-# lane.sio.port = '/dev/' + port_name
-# lane.sio.baudrate = 9600
-# lane.sio.preamble_char = b'\x80'
-# lane.sio.preamble_len = 16
-# lane.sio.header_struct = struct.Struct(8*'i')
-# lane.sio.header_payload_size_index = 6
-# lane.sio.crc_struct = struct.Struct('<I')
-# lane.sio.crc = crcmod.predefined.mkPredefinedCrcFun('xmodem')
-# lane.sio.subscribe(port_name, lane.serial_header_payload_checksum_handler)
-# lane.lio.subscribe(port_name, lane.lcm_handler)
-# lane.open() # TODO: add optional verbose output
 
 if __name__ == '__main__':
     import argparse
@@ -176,7 +159,7 @@ if __name__ == '__main__':
         type=str, help='serial port to bridge')
     parser.add_argument('-c', '--channel', default=None,
         type=str, help='LCM channel to bridge')
-    parser.add_argument('-b','--baudrate', default=38400,
+    parser.add_argument('-b','--baudrate', default=9600,
         type=int, help='baud rate for serial port')
     parser.add_argument('-v','--verbosity', default=0, action='count',
         help='increase output')
