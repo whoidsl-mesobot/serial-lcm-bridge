@@ -1,3 +1,4 @@
 python/lcmtypes/*
 java/lcmtypes/*
 *.pyc
+*lcmlog*
