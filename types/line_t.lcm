@@ -1,7 +1,6 @@
-package lcmtypes;
+package raw;
 
-struct line_t  // a generic container for text (e.g., received on a serial UART or read from a file)
-{
-    int64_t  timestamp;  // in milliseconds since 1970-01-01T00:00:00
-    string   line;       // UTF-8 encoded line
+struct string_t { // a generic container for ASCII or UTF-8 strings
+  int64_t utime; // microseconds since 1970-01-01T00:00:00
+  string  text;
 }
