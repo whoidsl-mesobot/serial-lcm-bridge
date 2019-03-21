@@ -15,7 +15,11 @@ AC_ARG_WITH([lcm-gen],
 )
 AS_IF([test "${LCMGEN}" == "no"], AC_MSG_ERROR([LCM generator "lcm-gen" not found])])
 
+#AC_PATH_PROG([RONN], [ronn])
+#AM_CONDITIONAL([HAVE_RONN], [test "x${RONN}" != x])
+
 AC_PROG_CC
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
+
 AC_OUTPUT

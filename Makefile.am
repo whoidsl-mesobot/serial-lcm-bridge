@@ -32,6 +32,13 @@ nodist_test_send_raw_bytes_SOURCES = raw_bytes_t.c
 test_send_raw_bytes_CFLAGS = $(LCM_CFLAGS) $(AM_CFLAGS)
 test_send_raw_bytes_LDFLAGS = $(LCM_LIBS)
 
+
+#man/man1/%: doc/%.ronn.md
+#	mkdir -p `dirname $@`
+#	$(RONN) -r $^ > $@
+#
+#doc: man/man1/serial-lcm-bridge.1
+
 MOSTLYCLEANFILES = \
 	raw_bytes_t.h \
 	raw_bytes_t.c
