@@ -1,4 +1,4 @@
-bin_PROGRAMS = serial-lcm-bridge
+bin_PROGRAMS = serial-lcm-bridge simple-serial-lcm-bridge
 dist_noinst_DATA = \
 	README.md \
 	LICENSE \
@@ -17,6 +17,11 @@ serial_lcm_bridge_SOURCES = c/bridge.c
 nodist_serial_lcm_bridge_SOURCES = raw_bytes_t.c
 serial_lcm_bridge_CFLAGS = $(LCM_CFLAGS) $(AM_CFLAGS)
 serial_lcm_bridge_LDFLAGS = $(LCM_LIBS)
+
+simple_serial_lcm_bridge_SOURCES = c/simple-bridge.c
+nodist_simple_serial_lcm_bridge_SOURCES = raw_bytes_t.c
+simple_serial_lcm_bridge_CFLAGS = $(LCM_CFLAGS) $(AM_CFLAGS)
+simple_serial_lcm_bridge_LDFLAGS = $(LCM_LIBS)
 
 TESTS = test-send_raw_bytes
 
