@@ -1,4 +1,10 @@
-python/lcmtypes/*
-java/lcmtypes/*
-*.pyc
-*lcmlog*
+Makefile.in
+compile
+configure
+config.h.in
+install-sh
+depcomp
+missing
+aclocal.m4
+autom4te.cache
+test-driver
