@@ -80,10 +80,14 @@ static error_t parse_opt( int key, char *arg, struct argp_state *state ) {
             }
             break;
         case 't':
-            args->terminator = *arg;
+            if( 1 != sscanf( arg, "%02hhx", &(args->terminator) ) ) {
+                argp_usage( state );
+            }
             break;
         case 'i':
-            args->initiator = *arg;
+            if( 1 != sscanf( arg, "%02hhx", &(args->initiator) ) ) {
+                argp_usage( state );
+            }
             break;
         case 'p':
             args->preserve_termios = 1;
@@ -252,9 +256,18 @@ int main( int argc, char **argv ){
     arguments.verbosity = 0;
     arguments.baudrate = B115200;
     arguments.preserve_termios = 0;
+    arguments.terminator = 0x0a;
+    arguments.initiator = arguments.terminator;
 
     argp_parse( &argp, argc, argv, 0, 0, &arguments );
     char * device = arguments.arg[0];
+
+    if( arguments.verbosity >= 0 ) {
+        printf( "initiator: 0x%02hhx '%c'\n", arguments.initiator,
+                arguments.initiator );
+        printf( "terminator: 0x%02hhx '%c'\n", arguments.terminator,
+                arguments.terminator );
+    }
 
     if( arguments.verbosity > 0 ) {
         printf( "opening device %s\n", arguments.arg[0] );
