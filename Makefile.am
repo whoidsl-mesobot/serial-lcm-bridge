@@ -15,7 +15,7 @@ raw_%.c raw_%.h: lcmtypes/raw_%.lcm
 BUILT_SOURCES = \
 	raw_bytes_t.h \
 	raw_bytes_t.c
-serial_lcm_bridge_SOURCES = c/bridge.c version.h
+serial_lcm_bridge_SOURCES = c/bridge.c
 #noinst_HEADERS = c/r2/r2_epoch.h
 nodist_serial_lcm_bridge_SOURCES = raw_bytes_t.c
 serial_lcm_bridge_CFLAGS = $(LCM_CFLAGS) $(AM_CFLAGS)
