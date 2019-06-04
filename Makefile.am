@@ -3,7 +3,9 @@ dist_noinst_DATA = \
 	README.md \
 	LICENSE \
 	lcmtypes/raw_bytes_t.lcm \
-    doc/serial-lcm-bridge.1.ronn.md
+	doc/serial-lcm-bridge.1.ronn.md
+
+EXTRA_DIST = build-aux/git-version-gen
 
 AM_CFLAGS = -Wall -std=gnu99 -I@builddir@
 
@@ -13,7 +15,7 @@ raw_%.c raw_%.h: lcmtypes/raw_%.lcm
 BUILT_SOURCES = \
 	raw_bytes_t.h \
 	raw_bytes_t.c
-serial_lcm_bridge_SOURCES = c/bridge.c
+serial_lcm_bridge_SOURCES = c/bridge.c version.h
 #noinst_HEADERS = c/r2/r2_epoch.h
 nodist_serial_lcm_bridge_SOURCES = raw_bytes_t.c
 serial_lcm_bridge_CFLAGS = $(LCM_CFLAGS) $(AM_CFLAGS)

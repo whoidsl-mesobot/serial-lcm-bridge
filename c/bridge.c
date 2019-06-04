@@ -15,12 +15,13 @@
 
 #include <lcm/lcm.h>
 
+#include "config.h"
 #include "raw_bytes_t.h"
 
 static char output_channel[32] = "__serial-lcm-bridge__";
 
-const char *argp_program_version = "serial-lcm-bridge 0.2";
-const char *argp_program_bug_address = "https://bitbucket.org/bluesquall/serial-lcm-bridge/issues";
+const char *argp_program_version = PACKAGE_STRING;
+const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
 static char doc[] = "serial-lcm-bridge -- a bridge between serial device and LCM";
 static char args_doc[] = "device";

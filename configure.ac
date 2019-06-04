@@ -1,6 +1,9 @@
-AC_INIT([serial-lcm-bridge], [0.2],
-	[https://bitbucket.org/bluesquall/serial-lcm-bridge/issues])
-AM_INIT_AUTOMAKE([subdir-objects dist-xz -Wall -Werror foreign])
+AC_INIT([serial-lcm-bridge],
+	m4_esyscmd([build-aux/git-version-gen .tarball-version]),
+	[https://bitbucket.org/bluesquall/serial-lcm-bridge/issues],
+	[],
+	[https://bitbucket.org/bluesquall/serial-lcm-bridge],
+)
 
 PKG_CHECK_MODULES(LCM, lcm >= 1.3.0)
 AC_SUBST(LCM_LIBS)
@@ -18,7 +21,9 @@ AS_IF([test "x${RONN}" == "x/bin/false"],
       AC_MSG_WARN([ronn not found; will not generate manpages]) )
 
 AC_PROG_CC
+AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_HEADERS([config.h])
+AM_INIT_AUTOMAKE([subdir-objects dist-xz -Wall -Werror foreign])
 AC_CONFIG_FILES([Makefile])
 
 AC_OUTPUT
