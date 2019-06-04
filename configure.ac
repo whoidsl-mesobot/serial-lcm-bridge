@@ -5,18 +5,16 @@ PKG_CHECK_MODULES(LCM, lcm >= 1.3.0)
 AC_SUBST(LCM_LIBS)
 AC_SUBST(LCM_CLFAGS)
 AC_SUBST(LCM_VERSION)
+AC_SEARCH_LIBS([lcm_create],[lcm])
 
-#AC_CHECK_PROG([LCMGEN],[lcm-gen],[lcm-gen])
-AC_ARG_WITH([lcm-gen],
-  [AS_HELP_STRING([--with-lcm-gen=/path/to/lcm-gen],
-    [Location of the LCM code generator tool lcm-gen.])],
-  [LCMGEN="$withval"],
-  [AS_IF([test "x${LCMGEN}" == "x"], [AC_PATH_PROG([LCMGEN], [lcm-gen], [no])])]
-)
-AS_IF([test "${LCMGEN}" == "no"], AC_MSG_ERROR([LCM generator "lcm-gen" not found])])
+AC_CHECK_PROG([LCMGEN], [lcm-gen], [lcm-gen], [/bin/false])
+AS_IF([test "${LCMGEN}" == "x/bin/false"],
+      AC_MSG_ERROR([LCM generator `lcm-gen` not found])])
 
-#AC_PATH_PROG([RONN], [ronn])
-#AM_CONDITIONAL([HAVE_RONN], [test "x${RONN}" != x])
+AC_CHECK_PROG([RONN], [ronn], [ronn], [/bin/false])
+AM_CONDITIONAL([HAVE_RONN],[test "x${RONN}" != "x/bin/false"])
+AS_IF([test "x${RONN}" == "x/bin/false"],
+      AC_MSG_WARN([ronn not found; will not generate manpages]) )
 
 AC_PROG_CC
 AC_CONFIG_HEADERS([config.h])

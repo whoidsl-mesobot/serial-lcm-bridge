@@ -7,7 +7,7 @@ This daemon provides an interface for a serial port over UDP by
 SYNOPSIS
 --------
 
-`serial-lcm-bridge` <*dev*> <*terminator*> <*initiator*>
+`serial-lcm-bridge` -vv -b <*baudrate*> -t <*terminator*> <*device*>
 
 DESCRIPTION
 -----------
@@ -18,15 +18,32 @@ attached to *dev*, providing output an accepting input via LCM.
 OPTIONS
 -------
 
-\-h, --help
-:   not implemented
+\-?, --help
+:   Give help list
+
+\--usage
+:   Give a short usage message
 
 \-b, --baudrate
 :   speed to use when communicating with the serial device
-:   (hard-coded to 115200)
+
+\-p, --preserve-termios
+:   leave termios options alone (if you set them by, e.g., `stty`)
+
+\-i, --initiator=initiator
+:   character that signals the start of a packet
+
+\-t --terminator=terminator
+:   character that signals the end of a packet
+
+\-q, --quiet
+:   say less
+
+\-v, --verbose
+:   say more
 
 \-V, --version
-:   not implemented
+:   Print program version
 
 
 EXAMPLES
@@ -39,10 +56,10 @@ To start an LCM interface connected to `/dev/ttyUSB0`:
 This will send an LCM message any time it receives the default terminator
 (0x0A) from the serial port.
 
-To listen for serial packets starting with SOH (0x01) and ending with ETX
-(0x03), pass the optional terminator and initiator arguments:
+To listen for serial packets starting with SOH (0x01) and ending with
+ETX (0x03), pass the optional terminator and initiator arguments:
 
-: serial-lcm-bridge /dev/ttyUSB0 $'\x03' $'\x01'
+: serial-lcm-bridge -b115200 -i 02 -t 03 /dev/ttyUSB0
 
 Note that the present implementation will block until it receives both
 characters from the serial port.
@@ -50,9 +67,9 @@ characters from the serial port.
 LCM INTERFACE
 -------------
 
-input: accepts messages in `raw_bytes_t` on channel *dev*<
+input: accepts messages in `raw_bytes_t` on channel *dev*i
 
-output: published messages in `raw_bytes_t` on channel *dev*>
+output: published messages in `raw_bytes_t` on channel *dev*o
 
 
 DIAGNOSTICS
