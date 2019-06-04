@@ -145,7 +145,7 @@ void sio_configure( FILE * fp, speed_t baudrate ) {
 
     opts.c_cflag |= baudrate;
 
-    // cfmakeraw( &opts );
+    cfmakeraw( &opts );
 
     if( -1 == tcsetattr( fileno( fp ), TCSAFLUSH, &opts ) ) {
         perror( "tcsetattr()" );
