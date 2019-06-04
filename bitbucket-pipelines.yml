@@ -1,0 +1,11 @@
+image: bluesquall/lcm:latest
+
+pipelines:
+  default:
+    - step:
+        script:
+          - autoreconf --install
+          - ./configure
+          - make
+          - make check
+          - make distcheck
