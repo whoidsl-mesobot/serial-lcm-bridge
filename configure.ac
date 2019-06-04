@@ -9,6 +9,8 @@ AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([subdir-objects dist-xz -Wall -Werror foreign])
 AC_CONFIG_FILES([Makefile])
 
+AC_SEARCH_LIBS([argp_parse],[argp])
+
 PKG_CHECK_MODULES(LCM, lcm >= 1.3.0)
 AC_SUBST(LCM_LIBS)
 AC_SUBST(LCM_CLFAGS)
