@@ -149,7 +149,7 @@ int main( int argc, char **argv){
         default: // data available on serial or LCM -- always check both
             if( pfd[0].revents & POLLIN ) { // check for serial input
                 if( arguments.verbosity > 1 ) {
-                    printf( "handling LCM input on fd %d\n", pfd[1].fd );
+                    printf( "handling LCM input on fd %d\n", pfd[0].fd );
                 }
                 lcm_handle( lio ); // handle the LCM input...
                 if( arguments.verbosity > 1 ) {
