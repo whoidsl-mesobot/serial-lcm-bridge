@@ -92,6 +92,15 @@ AUTHOR
 
 M Jordan Stanway <m.j.stanway@alum.mit.edu>
 
+REPOSITORY
+----------
+https://bitbucket.org/bluesquall/serial-lcm-bridge
+
+BUGS
+----
+https://bitbucket.org/bluesquall/serial-lcm-bridge/issues
+
+
 SEE ALSO
 --------
 

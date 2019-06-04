@@ -1,4 +1,5 @@
-AC_INIT([serial-lcm-bridge], [0.2], [m.j.stanway@alum.mit.edu])
+AC_INIT([serial-lcm-bridge], [0.2],
+	[https://bitbucket.org/bluesquall/serial-lcm-bridge/issues])
 AM_INIT_AUTOMAKE([subdir-objects dist-xz -Wall -Werror foreign])
 
 PKG_CHECK_MODULES(LCM, lcm >= 1.3.0)

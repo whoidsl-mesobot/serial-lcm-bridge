@@ -19,8 +19,8 @@
 
 static char output_channel[32] = "__serial-lcm-bridge__";
 
-const char *argp_program_version = "serial-lcm-bridge 0.x";
-const char *argp_program_bug_address = "m.j.stanway@alum.mit.edu";
+const char *argp_program_version = "serial-lcm-bridge 0.2";
+const char *argp_program_bug_address = "https://bitbucket.org/bluesquall/serial-lcm-bridge/issues";
 
 static char doc[] = "serial-lcm-bridge -- a bridge between serial device and LCM";
 static char args_doc[] = "device";
