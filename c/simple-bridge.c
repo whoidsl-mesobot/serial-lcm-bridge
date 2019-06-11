@@ -10,6 +10,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <sys/select.h>
+
 #include <lcm/lcm.h>
 
 #include "raw_bytes_t.h"
