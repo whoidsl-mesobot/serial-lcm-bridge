@@ -1,3 +1,5 @@
+#include "config.h"
+
 #define MAX_SERIAL_DATA_LENGTH 4096
 #define INPUT_SUFFIX "i"
 #define OUTPUT_SUFFIX "o"
@@ -15,7 +17,6 @@
 
 #include <lcm/lcm.h>
 
-#include "config.h"
 #include "raw_bytes_t.h"
 
 static char output_channel[32] = "__serial-lcm-bridge__";
