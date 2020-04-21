@@ -14,16 +14,19 @@ int main( int argc, char* argv[] ){
 
     raw_bytes_t msg = {
         .utime = -1,
-        .length = 5,
-        .data = (uint8_t *)"hello",
+        .length = 6,
+        .data = (uint8_t *)"hello\n",
     };
-    raw_bytes_t_publish( lio, argv[0], &msg );
 
-    for( int a = 2; a < argc; a++ ) {
+    const char * channel = ( argc > 1 ) ? argv[1] : "test";
+
+    raw_bytes_t_publish( lio, channel, &msg );
+
+    for( int a = 3; a < argc; a++ ) {
         msg.utime = a;
         msg.length = strlen( argv[a] );
         msg.data = (uint8_t *)argv[a];
-        raw_bytes_t_publish( lio, argv[1], &msg );
+        raw_bytes_t_publish( lio, channel, &msg );
         printf( "sent %d-byte message:", msg.length );
         for( int b = 0; b < msg.length; b++ ) {
             printf( " %02hhX", msg.data[b] );

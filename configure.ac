@@ -1,5 +1,5 @@
 AC_INIT([serial-lcm-bridge],
-	m4_esyscmd([build-aux/git-version-gen .tarball-version]),
+	m4_esyscmd([.build-aux/git-version-gen .tarball-version]),
 	[https://bitbucket.org/bluesquall/serial-lcm-bridge/issues],
 	[],
 	[https://bitbucket.org/bluesquall/serial-lcm-bridge],
