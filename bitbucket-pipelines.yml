@@ -20,4 +20,4 @@ pipelines:
           - make
           - make check
           - make distcheck
-          - find . -type f -iname "*.xz" -print0 | while read -d $'\0' -r file; do curl -X POST "https://${BB_AUTH_STRING}@api.bitbucket.org/2.0/repositories/${BITBUCKET_REPO_OWNER}/${BITBUCKET_REPO_SLUG}/downloads" --form files=@"$file"; done
+          - find . -type f -iname "*.xz" -print0 | while read -d $'\0' -r file; do curl --user "${BITBUCKET_REPO_OWNER}:${PIPELINE_APP_PASSWORD}" -X POST "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_REPO_OWNER}/${BITBUCKET_REPO_SLUG}/downloads" --form files=@"$file"; done
